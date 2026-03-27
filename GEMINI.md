@@ -19,7 +19,7 @@
 - Кожен скіл ОБОВ'ЯЗКОВО має `SKILL.md` із YAML frontmatter (`name`, `description`).
 - **Актуальність документації:** При кожній зміні коду/протоколів агент ЗОБОВ'ЯЗАНИЙ оновити відповідну документацію (README, SKILL.md) до завершення сесії.
 - Допоміжні файли: `scripts/`, `examples/`, `resources/`.
-- Валідація структури: `node .agents/skills/workspace-manager/scripts/verify-structure.js <path>`
+- Валідація структури: `node .agents/skills/workspace-manager/scripts/scaffold-skill.js --validate <path>`
 
 ## Git-конвенції
 
