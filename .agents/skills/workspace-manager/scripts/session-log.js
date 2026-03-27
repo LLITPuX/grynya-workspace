@@ -59,6 +59,7 @@ if (command === 'open') {
     session_id: process.env.SESSION_ID || "unknown",
     status: "[В процесі / Завершено / Перервано]",
     summary: "[Короткий підсумок робіт]",
+    docs_updated: "[Так/Ні — які файли оновлено]",
     errors: [],
     lessons: [
       {

@@ -4,6 +4,7 @@
     "session_id": "unknown",
     "status": "Завершено",
     "summary": "Створення нового робочого простору Grynya v2: ініціалізація, рефакторинг скілу workspace-manager на модульні протоколи, створення системи логування сесій (scaffold + session-log).",
+    "docs_updated": "Так — GEMINI.md, README.md, SKILL.md, protocols/*, session-log.js",
     "errors": [
       "Протоколи спочатку були вшиті в SKILL.md",
       "Деякі .md файли були англійською",
