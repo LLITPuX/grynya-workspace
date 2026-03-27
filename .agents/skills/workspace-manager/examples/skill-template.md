@@ -1,20 +1,35 @@
 ---
-name: [Skill Name]
-description: [Short, one-line description of what the skill does]
+name: [Назва скілу]
+description: [Короткий опис — одне речення]
 ---
 
-# [Skill Name]
+# [Назва скілу]
 
-You are an expert at [Specific Domain]. Your objective is to [Main Goal].
+[Опис призначення та контексту використання.]
 
-## Instructions
-1. Step 1...
-2. Step 2...
+## Протоколи
 
-## Best Practices
-- [List critical instructions or things the agent should avoid]
-- Example: CRITICAL INSTRUCTION 1: Do not use `cat` in bash to write files.
+| Протокол | Файл | Коли застосовувати |
+|----------|------|--------------------|
+| [Назва протоколу] | `protocols/[назва].md` | [Умова активації] |
 
-## Files to reference
-- If the skill uses specific scripts, list them here:
-  - `scripts/helper.js`: Used to [purpose]. Run it with `node scripts/helper.js <args>`.
+## Як використовувати
+
+1. Визнач, який протокол потрібен із таблиці вище
+2. Завантаж **лише** відповідний файл із `protocols/`
+3. Виконуй кроки послідовно
+4. Записуй помилки та рішення у `logs/`
+
+## Допоміжні файли
+
+| Файл | Призначення |
+|------|-------------|
+| `scripts/[назва].js` | [Опис скрипту] |
+| `examples/[назва].md` | [Опис прикладу] |
+| `resources/[назва].md` | [Опис ресурсу] |
+
+## Правила
+
+- SKILL.md — це **індекс**, протоколи виносити у `protocols/`
+- Вся документація — **українською**
+- Помилки та рішення — у `logs/`

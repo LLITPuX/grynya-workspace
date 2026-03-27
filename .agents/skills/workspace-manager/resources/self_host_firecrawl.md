@@ -1,3 +1,12 @@
+# Self-hosting Firecrawl — Довідник
+
+> **Резюме (українською):** Цей документ описує self-hosting Firecrawl — локальне розгортання через Docker.
+> Ключові кроки: налаштувати `.env`, запустити `docker compose up`, протестувати API на `localhost:3002`.
+> Обмеження self-hosted: немає Fire-engine, `/agent` та `/browser` не підтримуються.
+> Для AI-функцій (JSON format, /extract, summary) потрібен ключ OpenAI або Ollama.
+
+---
+
 # Self-hosting Firecrawl
 
 Refer to SELF_HOST.md for instructions on how to run it locally.
