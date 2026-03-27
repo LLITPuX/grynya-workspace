@@ -11,36 +11,34 @@
 
 ## Алгоритм
 
-### Крок 1. Створити batch-файл
+### Крок 1. Клонування репозиторію
 
-Створити `start_firecrawl.bat` у корені воркспейсу.
+Виконати команду у корені воркспейсу:
+```powershell
+git clone https://github.com/mendableai/firecrawl.git firecrawl-mcp
+```
 
-> [!CAUTION]
-> Використовуйте ТІЛЬКИ ASCII-символи у `echo` — стандартний Windows CMD (CP866) ламається від кирилиці!
+### Крок 2. Налаштування оточення
 
-```bat
-@echo off
-echo Starting Firecrawl Server Locally...
-cd /d "%~dp0"
-IF NOT EXIST "firecrawl-local" ( git clone https://github.com/mendableai/firecrawl.git firecrawl-local )
-cd firecrawl-local
-IF EXIST "apps\api\.env.example" IF NOT EXIST "apps\api\.env" ( copy apps\api\.env.example apps\api\.env )
+Перейти в директорію та підготувати `.env` файл:
+```powershell
+cd firecrawl-mcp
+cp apps/api/.env.example apps/api/.env
+```
+
+### Крок 3. Запуск контейнерів
+
+Запустити сервіси через Docker Compose:
+```powershell
 docker compose up -d
 ```
 
-### Крок 2. Ручний запуск
+### Крок 4. Налаштування MCP
 
-Попросити користувача запустити `.bat` файл власноруч.
-
-> [!WARNING]
-> Уникайте `run_command` для запуску Docker-команд — можливі проблеми з UI-підтвердженням.
-
-### Крок 3. Налаштування MCP
-
-Додати блок у `c:\Users\admin\.gemini\antigravity\mcp_config.json`:
+Додати або оновити блок у `c:\Users\admin\.gemini\antigravity\mcp_config.json`:
 
 ```json
-"firecrawl-local": {
+"firecrawl-mcp": {
   "command": "npx",
   "args": ["-y", "firecrawl-mcp"],
   "env": {
@@ -50,12 +48,9 @@ docker compose up -d
 }
 ```
 
-> [!NOTE]
-> У npm-реєстрі пакет називається `firecrawl-mcp`, а не `@mendableai/...`
+### Крок 5. Завершення
 
-### Крок 4. Завершення
-
-Попросити користувача перезапустити агент або натиснути «Refresh» у налаштуваннях MCP.
+Натиснути «Refresh» у налаштуваннях MCP або перезапустити агент.
 
 ## Довідка
 
