@@ -1,0 +1,17 @@
+# docker-compose.yml
+services:
+  grynya-workspace:
+    build: .
+    container_name: grynya-workspace
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ENV=development
+    tty: true
+    stdin_open: true
+    networks:
+      - grynya-network
+
+networks:
+  grynya-network:
+    driver: bridge

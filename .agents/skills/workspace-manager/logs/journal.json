@@ -24,5 +24,30 @@
       "Почати розробку нових скілів за допомогою scaffold-skill.js",
       "Перевірити роботу протоколу Firecrawl при реальній потребі"
     ]
+  },
+  {
+    "date": "2026-03-27T15:21:58.761Z",
+    "session_id": "f0ddf70f-9cb7-4591-bc83-3a076541e5d7",
+    "status": "Завершено",
+    "summary": "Впроваджено гібридну Docker-архітектуру для ізоляції воркспейсу. Створено Dockerfile, docker-compose.yml, оновлено GEMINI.md та протокол ініціалізації.",
+    "docs_updated": "Так — GEMINI.md, workspace-init.md, SKILL.md",
+    "errors": [
+      "PowerShell не розпізнає 'grep' (виправлено через dir -Filter)",
+      "Пропущено ArtifactMetadata при створенні task.md (виправлено)"
+    ],
+    "lessons": [
+      {
+        "problem": "Використання Linux-команд на Windows-хості за межами контейнера",
+        "solution": "Завжди перевіряти ОС або спочатку запускати оточення Docker перед виконанням скриптів"
+      },
+      {
+        "problem": "Валідація артефактів вимагає обов'язкових метаданих",
+        "solution": "Додавати ArtifactMetadata до кожного виклику write_to_file з IsArtifact: true"
+      }
+    ],
+    "next_steps": [
+      "Автоматизувати запуск контейнерів при відкритті сесії",
+      "Додати перевірку статусу Docker в протокол session-open"
+    ]
   }
 ]

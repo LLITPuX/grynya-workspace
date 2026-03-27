@@ -30,18 +30,21 @@ git init
 git checkout -b main
 ```
 
-### Крок 4. Створити GitHub-репозиторій
+### Крок 4. Налаштувати Docker-оточення
 
-Через GitHub MCP або CLI:
+Створити `Dockerfile` та `docker-compose.yml` в корені (якщо вони відсутні) для забезпечення ізоляції.
+
+### Крок 5. Запустити середовище
+
 ```bash
-gh repo create <repo-name> --public --source=. --remote=origin --push
+docker compose up -d
 ```
 
-### Крок 5. Перший коміт
+### Крок 6. Перший коміт
 
 ```bash
 git add .
-git commit -m "feat: initialize workspace structure"
+git commit -m "feat: initialize workspace with docker isolation"
 git push -u origin main
 ```
 
