@@ -27,6 +27,29 @@ function getLatestCommitInGraph() {
     return null;
 }
 
+function ensurePath(filePath) {
+    const parts = filePath.split('/');
+    let parentPath = REPO_NAME;
+    
+    // Переконуємося, що корінь (Repository) існує
+    runQuery(`MERGE (r:Repository {name: "${REPO_NAME}", path: "${REPO_NAME}"})`);
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isFile = (i === parts.length - 1);
+        const currentPath = parts.slice(0, i + 1).join('/');
+        
+        if (isFile) {
+            // Створюємо файл та зв'язуємо з папкою
+            runQuery(`MATCH (p {path: "${parentPath}"}) MERGE (f:File {path: "${currentPath}"}) SET f.name = "${part}" MERGE (p)-[:CONTAINS]->(f)`);
+        } else {
+            // Створюємо папку та зв'язуємо з батьком
+            runQuery(`MATCH (p {path: "${parentPath}"}) MERGE (f:Folder {path: "${currentPath}"}) SET f.name = "${part}" MERGE (p)-[:CONTAINS]->(f)`);
+        }
+        parentPath = currentPath;
+    }
+}
+
 function syncIncremental() {
     const lastSha = getLatestCommitInGraph();
     if (!lastSha) {
@@ -52,6 +75,7 @@ function syncIncremental() {
                 };
             });
 
+            // 1. Створюємо комміти та часову сітку
             const data = toCypher(commits);
             const query = `UNWIND ${data} AS row 
                 MERGE (c:Commit {sha: row.sha}) SET c.message = row.message
@@ -63,14 +87,14 @@ function syncIncremental() {
             runQuery(query);
             console.log(`// Оновлено графу новими коммітами: ${commits.length}`);
 
-            // Оновлення зв'язків з файлами
+            // 2. Оновлення структури папок/файлів та зв'язків з коммітами
             commits.forEach(c => {
                 const filesOutput = execSync(`git show --name-only --pretty=format: ${c.sha}`, { encoding: 'utf8' }).trim();
                 const files = filesOutput.split('\n').filter(f => f.trim());
-                if (files.length > 0) {
-                    const filesData = toCypher(files.map(f => ({ path: f, sha: c.sha })));
-                    runQuery(`UNWIND ${filesData} AS row MERGE (f:File {path: row.path}) WITH f, row MATCH (c:Commit {sha: row.sha}) MERGE (f)-[:HAS_COMMIT]->(c)`);
-                }
+                files.forEach(f => {
+                    ensurePath(f); // Створює ієрархію та зв'язок CONTAINS
+                    runQuery(`MATCH (f:File {path: "${f}"}), (c:Commit {sha: "${c.sha}"}) MERGE (f)-[:HAS_COMMIT]->(c)`);
+                });
             });
         }
 
@@ -96,15 +120,12 @@ function processSessionLogs() {
                 const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
                 if (data.status === 'Завершено') {
-                    // Знаходимо комміт, у якого повідомлення містить назву файлу сесії
                     const findCommitQuery = `MATCH (c:Commit) WHERE c.message CONTAINS '${file}' RETURN c.sha`;
                     const res = runQuery(findCommitQuery);
                     const lines = res.stdout.toString().split('\n').filter(l => l.trim() && !l.includes('internal execution time') && !l.includes('Cached execution') && !l.includes('c.sha'));
                     
                     if (lines.length > 0) {
                         const sha = lines[0].trim();
-                        
-                        // Створюємо вузли Summary для кожного файлу
                         if (data.files_changed && data.files_changed.length > 0) {
                             const summaries = data.files_changed.map(f => ({
                                 file: f.file,

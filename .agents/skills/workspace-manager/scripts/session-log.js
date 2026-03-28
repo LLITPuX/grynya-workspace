@@ -87,18 +87,21 @@ if (command === 'open') {
       .filter(line => line.trim())
       .map(line => line.slice(3).trim());
 
-    // Зберігаємо старі описи, якщо вони є
-    const existingFilesMap = new Map();
-    (sessionData.files_changed || []).forEach(f => existingFilesMap.set(f.file, f.summary));
+    // Зберігаємо ВСІ існуючі записи з JSON
+    const mergedFiles = [...(sessionData.files_changed || [])];
+    const existingFilesSet = new Set(mergedFiles.map(f => f.file));
 
-    const updatedFiles = gitFiles.map(file => {
-      return {
-        file: file,
-        summary: existingFilesMap.has(file) ? existingFilesMap.get(file) : "[Очікує на детальний опис]"
-      };
+    // Додаємо нові файли з Git, яких ще немає в списку
+    gitFiles.forEach(file => {
+      if (!existingFilesSet.has(file)) {
+        mergedFiles.push({
+          file: file,
+          summary: "[Очікує на детальний опис]"
+        });
+      }
     });
 
-    sessionData.files_changed = updatedFiles;
+    sessionData.files_changed = mergedFiles;
   } catch (e) {
     console.warn('⚠️ Не вдалося отримати статус Git.');
   }

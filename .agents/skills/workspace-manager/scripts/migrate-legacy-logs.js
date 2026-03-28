@@ -12,12 +12,17 @@ function runQuery(cypher) {
     return res;
 }
 
-if (!fs.existsSync(JOURNAL_PATH)) {
-    console.error("❌ journal.json не знайдено.");
+let journalPath = path.resolve(__dirname, '..', 'logs', 'journal.json');
+if (!fs.existsSync(journalPath)) {
+    journalPath = journalPath + '.bak';
+}
+
+if (!fs.existsSync(journalPath)) {
+    console.error("❌ journal.json (або .bak) не знайдено.");
     process.exit(1);
 }
 
-const journalData = fs.readFileSync(JOURNAL_PATH, 'utf8');
+const journalData = fs.readFileSync(journalPath, 'utf8');
 const escapedData = journalData.replace(/"/g, "'").replace(/'/g, "\\'");
 
 console.log("⏳ Міграція journal.json у FalkorDB...");
