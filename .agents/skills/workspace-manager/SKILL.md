@@ -13,6 +13,7 @@ description: Управління робочим простором — ініц
 |----------|------|--------------------|
 | Ініціалізація воркспейсу | `protocols/workspace-init.md` | Створення нового проєкту з нуля (Docker, Git) |
 | Встановлення Firecrawl | `protocols/firecrawl-setup.md` | Потрібен локальний MCP-сервер для веб-скрапінгу |
+| Встановлення FalkorDB | `protocols/falkordb-setup.md` | Розгортання локальної бази даних FalkorDB та підключення її як MCP-сервера |
 | Створення скілів | `protocols/create-skill.md` | Додавання нового скілу до воркспейсу |
 | Відкриття сесії | `protocols/session-open.md` | Отримання контексту та оновлення MCP-конфігу |
 | Закриття сесії | `protocols/session-close.md` | Фіксація досвіду та аудит документації |
@@ -21,6 +22,7 @@ description: Управління робочим простором — ініц
 | Середовище розробки | `protocols/dev-environment.md` | Hot Reload, поллінг на Windows, Bind Mounts |
 | Обслуговування | `protocols/infrastructure-maintenance.md` | Healthcheck контейнерів, очищення логів |
 | Діагностика графа | `protocols/graph-diagnostic.md` | Перевірка цілісності та статистики FalkorDB |
+| Аудит документації | `protocols/documentation-audit.md` | Періодична перевірка актуальності та консистентності документації скілів |
 
 ## Як використовувати
 
@@ -39,5 +41,6 @@ description: Управління робочим простором — ініц
 | `scripts/sync-git-update.js` | Інкрементальне оновлення графа |
 | `scripts/update-mcp-config.js` | Синхронізує mcp_config.json з Docker |
 | `scripts/graph-diagnostic.js` | Діагностика цілісності та статистики графа |
+| `scripts/audit-docs.js` | Комплексний аудит документації скілів |
 | `examples/skill-template.md` | Шаблон SKILL.md для нових скілів |
 | `resources/self_host_firecrawl.md` | Довідник з self-hosting Firecrawl |

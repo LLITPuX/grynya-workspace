@@ -18,8 +18,12 @@
 - Усі скіли розміщуються у `.agents/skills/<skill-name>/`.
 - Кожен скіл ОБОВ'ЯЗКОВО має `SKILL.md` із YAML frontmatter (`name`, `description`).
 - **Актуальність документації:** При кожній зміні коду/протоколів агент ЗОБОВ'ЯЗАНИЙ оновити відповідну документацію (README, SKILL.md) до завершення сесії.
-- Допоміжні файли: `scripts/`, `examples/`, `resources/`.
+- **Структура скілу:**
+  - **Ядро:** `SKILL.md` (індекс), `protocols/` (алгоритми та інструкції)
+  - **Допоміжні:** `scripts/`, `examples/`, `resources/` (інструменти)
+  - **Стан:** `logs/` (історія сесій та помилки)
 - Валідація структури: `node .agents/skills/workspace-manager/scripts/scaffold-skill.js --validate <path>`
+- Комплексний аудит: `node .agents/skills/workspace-manager/scripts/audit-docs.js`
 
 ## Git-конвенції
 
