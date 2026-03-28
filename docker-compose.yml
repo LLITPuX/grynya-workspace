@@ -14,6 +14,27 @@ services:
     networks:
       - grynya-network
 
+  falkordb:
+    image: falkordb/falkordb-server:latest
+    container_name: falkordb
+    ports:
+      - "6379:6379"
+    networks:
+      - grynya-network
+
+  falkordb-browser:
+    image: falkordb/falkordb-browser:latest
+    container_name: falkordb-browser
+    ports:
+      - "3000:3000"
+    environment:
+      - FALKORDB_URL=redis://falkordb:6379
+      - ENCRYPTION_KEY=2d919787599c41f1bc6de6f92d40cb66b559ad8ee8334ba380789f2ba30e2025
+    depends_on:
+      - falkordb
+    networks:
+      - grynya-network
+
 networks:
   grynya-network:
     driver: bridge

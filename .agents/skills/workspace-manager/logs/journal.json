@@ -118,5 +118,36 @@
       "Додати перевірку валідності JSON логів перед комітом"
     ],
     "date_closed": "2026-03-28T11:43:49.129Z"
+  },
+  {
+    "date": "2026-03-28T12:15:34.134Z",
+    "session_id": "36d6199b-867c-4782-8b65-d92fb9ec22a3",
+    "status": "Завершено",
+    "summary": "Розгортання FalkorDB MCP та Browser UI. Створено нову інфраструктуру в Docker з роздільними сервісами. Налаштовано MCP-сервер для графових запитів та оновлено протоколи.",
+    "docs_updated": "Так — docker-compose.yml, mcp_config.json, protocols/falkordb-setup.md, walkthrough.md, journal.json",
+    "errors": [
+      "ECONNREFUSED при підключенні браузера до бази через localhost",
+      "Invalid credentials у Browser UI через відсутність ENCRYPTION_KEY",
+      "Таймаут localhost:3000 на Windows хості"
+    ],
+    "lessons": [
+      {
+        "problem": "Використання localhost у Docker-мережі",
+        "solution": "Завжди використовувати імена сервісів (falkordb) для inter-container communication."
+      },
+      {
+        "problem": "Відсутність ключа шифрування у Browser UI",
+        "solution": "Додано ENCRYPTION_KEY у змінні оточення для стабільної авторизації."
+      },
+      {
+        "problem": "Проблеми IPv6/IPv4 з localhost на Windows",
+        "solution": "Рекомендувати використання 127.0.0.1 для доступу до сервісів ззовні."
+      }
+    ],
+    "next_steps": [
+      "Інтегрувати збереження контексту сесій у FalkorDB",
+      "Створити Cypher-запити для аналізу активності"
+    ],
+    "date_closed": "2026-03-28T12:45:00.000Z"
   }
 ]
