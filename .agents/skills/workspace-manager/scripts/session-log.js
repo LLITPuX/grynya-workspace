@@ -80,19 +80,25 @@ if (command === 'open') {
 
   const sessionData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-  // 1. Отримання змінених файлів через git status
+  // 1. Отримання змінених файлів через git status та об'єднання з існуючими
   try {
     const status = execSync('git status --porcelain', { encoding: 'utf8' });
-    const files = status.split('\n')
+    const gitFiles = status.split('\n')
       .filter(line => line.trim())
-      .map(line => {
-        const filePathRelative = line.slice(3).trim();
-        return {
-          file: filePathRelative,
-          summary: "[Автоматично додано при закритті]"
-        };
-      });
-    sessionData.files_changed = files;
+      .map(line => line.slice(3).trim());
+
+    // Зберігаємо старі описи, якщо вони є
+    const existingFilesMap = new Map();
+    (sessionData.files_changed || []).forEach(f => existingFilesMap.set(f.file, f.summary));
+
+    const updatedFiles = gitFiles.map(file => {
+      return {
+        file: file,
+        summary: existingFilesMap.has(file) ? existingFilesMap.get(file) : "[Очікує на детальний опис]"
+      };
+    });
+
+    sessionData.files_changed = updatedFiles;
   } catch (e) {
     console.warn('⚠️ Не вдалося отримати статус Git.');
   }
