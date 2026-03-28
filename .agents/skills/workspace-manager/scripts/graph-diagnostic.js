@@ -89,6 +89,27 @@ function checkIntegrity() {
     if (issuesFound === 0) console.log(`✅ Проблем зі структурою не виявлено.`);
 }
 
+function checkGraphSessionRelationships() {
+    console.log(`\n🕸️  ПЕРЕВІРКА МЕРЕЖІ СЕСІЙ:`);
+    let issuesFound = 0;
+
+    // 1. Session без Day
+    const orphanSessions = getDataLines(runQuery(`MATCH (s:Session) WHERE NOT (:Day)-[:AT]->(s) RETURN s.id`));
+    if (orphanSessions.length > 1) {
+        console.warn(`⚠️  Знайдено вузли Session без часової прив'язки Day (${orphanSessions.length-1})`);
+        issuesFound++;
+    }
+
+    // 2. Розірвані ланцюги NEXT (може бути лише 1 сесія без попередника)
+    const noIncomingNext = getDataLines(runQuery(`MATCH (s:Session) WHERE NOT ()-[:NEXT]->(s) RETURN s.id`));
+    if (noIncomingNext.length > 2) {
+        console.warn(`⚠️  Порушено хронологічний ланцюг NEXT. Більше однієї сесії не мають попередника (${noIncomingNext.length-1})`);
+        issuesFound++;
+    }
+
+    if (issuesFound === 0) console.log(`✅ Хронологічна мережа сесій повністю консистентна.`);
+}
+
 function checkSessionIntegrity() {
     console.log(`\n📂 ПЕРЕВІРКА СЕСІЙ ТА ЛОГІВ:`);
     let issuesFound = 0;
@@ -105,9 +126,15 @@ function checkSessionIntegrity() {
                 const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
                 if (data.status === 'Завершено') {
-                    // 1. Перевірка заповнення шаблону
                     if (data.summary.includes('[') || data.summary === "") {
                         console.warn(`⚠️  [${skill}] Сесія ${file} має незаповнений summary.`);
+                        issuesFound++;
+                    }
+
+                    // 1.5 Перевірка наявності вузла Session
+                    const sessRes = runQuery(`MATCH (s:Session {id: '${file}'}) RETURN s.id`);
+                    if (getDataLines(sessRes).length <= 1) {
+                        console.warn(`⚠️  [${skill}] Вузол Session для сесії ${file} відсутній у базі FalkorDB.`);
                         issuesFound++;
                     }
 
@@ -127,8 +154,17 @@ function checkSessionIntegrity() {
                                 if (sums.length <= 1) {
                                     console.warn(`⚠️  [${skill}] Відсутній вузол Summary для файлу ${fc.file} у комміті ${sha}.`);
                                     issuesFound++;
-                                } else if (sums[1].includes('[Автоматично додано]')) {
-                                    console.warn(`ℹ️  [${skill}] Файл ${fc.file} має лише автоматичний опис. Бажано додати деталі.`);
+                                } else {
+                                    if (sums[1].includes('[Автоматично додано]')) {
+                                        console.warn(`ℹ️  [${skill}] Файл ${fc.file} має лише автоматичний опис. Бажано додати деталі.`);
+                                    }
+                                    
+                                    // 4. Перевірка зв'язку Session -> Summary
+                                    const prodRes = runQuery(`MATCH (:Session {id: '${file}'})-[:PRODUCED]->(s:Summary {file: '${fc.file}', sha: '${sha}'}) RETURN s.text`);
+                                    if (getDataLines(prodRes).length <= 1) {
+                                        console.warn(`⚠️  [${skill}] Сесія ${file} не прив'язана до Summary (PRODUCED) для файлу ${fc.file}.`);
+                                        issuesFound++;
+                                    }
                                 }
                             });
                         }
@@ -151,5 +187,6 @@ checkDocker();
 checkPing();
 getStats();
 checkIntegrity();
+checkGraphSessionRelationships();
 checkSessionIntegrity();
 console.log(`\n🏁 Діагностика завершена.`);

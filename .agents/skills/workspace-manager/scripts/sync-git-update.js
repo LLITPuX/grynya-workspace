@@ -111,6 +111,8 @@ function processSessionLogs() {
     const skillsDir = path.resolve(__dirname, '..', '..');
     const skills = fs.readdirSync(skillsDir).filter(f => fs.lstatSync(path.join(skillsDir, f)).isDirectory() && !f.startsWith('.'));
 
+    let allSessions = [];
+
     skills.forEach(skill => {
         const logsDir = path.join(skillsDir, skill, 'logs');
         if (fs.existsSync(logsDir)) {
@@ -120,31 +122,63 @@ function processSessionLogs() {
                 const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
                 if (data.status === 'Завершено') {
-                    const findCommitQuery = `MATCH (c:Commit) WHERE c.message CONTAINS '${file}' RETURN c.sha`;
-                    const res = runQuery(findCommitQuery);
-                    const lines = res.stdout.toString().split('\n').filter(l => l.trim() && !l.includes('internal execution time') && !l.includes('Cached execution') && !l.includes('c.sha'));
-                    
-                    if (lines.length > 0) {
-                        const sha = lines[0].trim();
-                        if (data.files_changed && data.files_changed.length > 0) {
-                            const summaries = data.files_changed.map(f => ({
-                                file: f.file,
-                                summary: f.summary.replace(/"/g, "'").replace(/'/g, "\\'"),
-                                sha: sha
-                            }));
-                            
-                            const query = `UNWIND ${toCypher(summaries)} AS row
-                                MATCH (c:Commit {sha: row.sha})
-                                MERGE (f:File {path: row.file})
-                                MERGE (s:Summary {file: row.file, sha: row.sha})
-                                SET s.text = row.summary
-                                MERGE (c)-[:DETAILS]->(s)
-                                MERGE (s)-[:DESCRIBES]->(f)`;
-                            runQuery(query);
-                        }
-                    }
+                    allSessions.push({ skill, file, data });
                 }
             });
+        }
+    });
+
+    // Сортуємо хронологічно за назвою файлу
+    allSessions.sort((a, b) => a.file.localeCompare(b.file));
+
+    let prevSessionFile = null;
+
+    allSessions.forEach(({ skill, file, data }) => {
+        const findCommitQuery = `MATCH (c:Commit) WHERE c.message CONTAINS '${file}' RETURN c.sha`;
+        const res = runQuery(findCommitQuery);
+        const lines = res.stdout.toString().split('\n').filter(l => l.trim() && !l.includes('internal execution time') && !l.includes('Cached execution') && !l.includes('c.sha'));
+        
+        if (lines.length > 0) {
+            const sha = lines[0].trim();
+            const dateObj = new Date(data.date_closed || data.date_opened);
+            const y = dateObj.getFullYear();
+            const m = dateObj.getMonth() + 1;
+            const day = dateObj.getDate();
+            const t = dateObj.toTimeString().split(' ')[0];
+
+            let sessionQuery = `MERGE (sess:Session {id: "${file}"})
+                SET sess.skill = "${skill}", sess.date_closed = "${data.date_closed}"
+                MERGE (y:Year {value: ${y}})
+                MERGE (d:Day {value: ${day}, year: ${y}, month: ${m}})
+                MERGE (y)-[:MONTH {number: ${m}}]->(d)
+                MERGE (d)-[:AT {time: "${t}"}]->(sess)`;
+            
+            if (prevSessionFile) {
+                // Додаємо зв'язок NEXT з попередньою сесією
+                sessionQuery += ` WITH sess MATCH (prev:Session {id: "${prevSessionFile}"}) MERGE (prev)-[:NEXT]->(sess)`;
+            }
+            runQuery(sessionQuery);
+
+            prevSessionFile = file;
+
+            if (data.files_changed && data.files_changed.length > 0) {
+                const summaries = data.files_changed.map(f => ({
+                    file: f.file,
+                    summary: f.summary.replace(/"/g, "'").replace(/'/g, "\\'"),
+                    sha: sha
+                }));
+                
+                const query = `UNWIND ${toCypher(summaries)} AS row
+                    MATCH (c:Commit {sha: row.sha})
+                    MATCH (sess:Session {id: "${file}"})
+                    MERGE (f:File {path: row.file})
+                    MERGE (s:Summary {file: row.file, sha: row.sha})
+                    SET s.text = row.summary
+                    MERGE (c)-[:DETAILS]->(s)
+                    MERGE (s)-[:DESCRIBES]->(f)
+                    MERGE (sess)-[:PRODUCED]->(s)`;
+                runQuery(query);
+            }
         }
     });
 }

@@ -60,5 +60,6 @@ node .agents/skills/workspace-manager/scripts/scaffold-skill.js --validate <шл
 
 - SKILL.md — це **індекс**, а не монолітна інструкція
 - Протоколи виносити в окремі файли у `protocols/`
+- Максимальна автоматизація: всі рутинні дії в протоколах повинні бути автоматизовані за допомогою JS скриптів у папці `scripts/`.
 - Шаблон: `examples/skill-template.md`
 - Помилки та рішення записувати в `logs/`

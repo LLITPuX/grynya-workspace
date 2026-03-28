@@ -21,6 +21,7 @@
 - **Структура скілу:**
   - **Ядро:** `SKILL.md` (індекс), `protocols/` (алгоритми та інструкції)
   - **Допоміжні:** `scripts/`, `examples/`, `resources/` (інструменти)
+  - **Автоматизація:** Максимально використовуйте JS скрипти у папці `scripts/` для автоматизації рутинних задач у протоколах. Це найкращий патерн для створення надійних скілів.
   - **Стан:** `logs/` (історія сесій та помилки)
 - Валідація структури: `node .agents/skills/workspace-manager/scripts/scaffold-skill.js --validate <path>`
 - Комплексний аудит: `node .agents/skills/workspace-manager/scripts/audit-docs.js`
