@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 
 /**
- * session-log.js — Керування журналом сесій у скілах.
+ * session-log.js — Керування сесіями Grynya.
  * 
  * Використання:
- *   node session-log.js open <skill-name>                      — створити запис "В процесі"
- *   node session-log.js close <skill-name> "<короткий-звіт>"   — фіналізувати запис
+ *   node session-log.js open <skill-name>                      — створити шаблон сесії
+ *   node session-log.js close <skill-name> "<короткий-звіт>"   — фіналізувати, коміт, діагностика
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const args = process.argv.slice(2);
 const command = args[0];
 const skillName = args[1];
-const summary = args[2] || "[Короткий підсумок робіт]";
+const summary = args[2] || "";
 
 if (!command || !skillName) {
   console.error('❌ Використання: node session-log.js <open|close> <skill-name> [summary]');
@@ -22,73 +23,121 @@ if (!command || !skillName) {
 }
 
 const skillDir = path.resolve(__dirname, '..', '..', skillName); 
-const journalPath = path.join(skillDir, 'logs', 'journal.json');
+const logsDir = path.join(skillDir, 'logs');
+const currentSessionPointer = path.join(logsDir, '.current_session');
 
 if (!fs.existsSync(skillDir)) {
   console.error(`❌ Скіл "${skillName}" не знайдено: ${skillDir}`);
   process.exit(1);
 }
 
-if (!fs.existsSync(path.join(skillDir, 'logs'))) {
-  fs.mkdirSync(path.join(skillDir, 'logs'), { recursive: true });
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
 }
 
-let journal = [];
-if (fs.existsSync(journalPath)) {
-  try {
-    const data = fs.readFileSync(journalPath, 'utf8');
-    journal = JSON.parse(data);
-  } catch (e) {
-    console.error(`⚠️ Помилка читання journal.json: ${e.message}`);
-  }
+function getTimestamp() {
+  const now = new Date();
+  return now.toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
 }
-
-// Поточний ID сесії (можна передавати через ENV)
-const currentSessionId = process.env.SESSION_ID || "unknown";
 
 if (command === 'open') {
-  // Створюємо новий запис на початку сесії
-  const newEntry = {
-    date: new Date().toISOString(),
-    session_id: currentSessionId,
+  const timestamp = getTimestamp();
+  const filename = `session_${timestamp}.json`;
+  const filePath = path.join(logsDir, filename);
+
+  const template = {
+    date_opened: new Date().toISOString(),
+    skill: skillName,
     status: "В процесі",
-    summary: summary !== "[Короткий підсумок робіт]" ? summary : "[Сесія розпочата]",
-    docs_updated: "[В роботі]",
+    summary: "[Очікується заповнення при close]",
+    files_changed: [],
     errors: [],
     lessons: [],
     next_steps: []
   };
-  
-  journal.push(newEntry);
-  fs.writeFileSync(journalPath, JSON.stringify(journal, null, 2), 'utf8');
-  
-  console.log(`\n📂 Сесію розпочато для "${skillName}".`);
-  console.log(`📝 Запис створено у ${journalPath} зі статусом "В процесі".`);
+
+  fs.writeFileSync(filePath, JSON.stringify(template, null, 2), 'utf8');
+  fs.writeFileSync(currentSessionPointer, filename, 'utf8');
+
+  console.log(`\n📂 Сесію відкрито для "${skillName}".`);
+  console.log(`📝 Створено шаблон: logs/${filename}`);
 
 } else if (command === 'close') {
-  if (journal.length === 0) {
-    console.error('❌ Журнал порожній. Спочатку запустіть "open".');
+  if (!fs.existsSync(currentSessionPointer)) {
+    console.error('❌ Не знайдено активної сесії. Запустіть "open" спочатку.');
     process.exit(1);
   }
 
-  // Шукаємо останній запис або запис з поточним ID
-  let entry = journal.find(e => e.session_id === currentSessionId && e.status === "В процесі") 
-             || journal[journal.length - 1];
+  const filename = fs.readFileSync(currentSessionPointer, 'utf8').trim();
+  const filePath = path.join(logsDir, filename);
 
-  if (entry) {
-    entry.status = "Завершено";
-    entry.summary = summary;
-    entry.date_closed = new Date().toISOString();
-    
-    // Якщо summary містить [RESET], ми можемо очистити lessons/errors для заповнення вручну
-    // або залишити як є.
-    
-    fs.writeFileSync(journalPath, JSON.stringify(journal, null, 2), 'utf8');
-    console.log(`\n✅ Сесію закрито для "${skillName}".`);
-    console.log(`📊 Статус оновлено на "Завершено". Не забудьте перевірити lessons/errors в JSON.`);
-  } else {
-    console.error('❌ Не знайдено відкритої сесії для оновлення.');
+  if (!fs.existsSync(filePath)) {
+    console.error(`❌ Файл сесії ${filename} не знайдено.`);
+    process.exit(1);
   }
+
+  console.log(`\n🔒 Закриття сесії: ${filename}...`);
+
+  const sessionData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+  // 1. Отримання змінених файлів через git status
+  try {
+    const status = execSync('git status --porcelain', { encoding: 'utf8' });
+    const files = status.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const filePathRelative = line.slice(3).trim();
+        return {
+          file: filePathRelative,
+          summary: "[Автоматично додано при закритті]"
+        };
+      });
+    sessionData.files_changed = files;
+  } catch (e) {
+    console.warn('⚠️ Не вдалося отримати статус Git.');
+  }
+
+  // 2. Оновлення даних
+  sessionData.status = "Завершено";
+  sessionData.date_closed = new Date().toISOString();
+  sessionData.summary = summary || sessionData.summary;
+
+  fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2), 'utf8');
+  console.log(`✅ Дані сесії оновлено.`);
+
+  // 3. Git Commit
+  try {
+    console.log(`📦 Виконую коміт...`);
+    execSync('git add .');
+    const commitMsg = `feat: close session ${skillName} (${filename})`;
+    execSync(`git commit -m "${commitMsg}"`);
+    console.log(`✅ Коміт створено.`);
+  } catch (e) {
+    console.error(`❌ Помилка коміту: ${e.message}`);
+  }
+
+  // 4. Оновлення графа
+  try {
+    console.log(`🔄 Оновлюю граф...`);
+    const syncScript = path.join(__dirname, 'sync-git-update.js');
+    execSync(`node "${syncScript}"`);
+    console.log(`✅ Граф оновлено.`);
+  } catch (e) {
+    console.error(`❌ Помилка синхронізації графа: ${e.message}`);
+  }
+
+  // 5. Діагностика
+  try {
+    console.log(`🔍 Запускаю діагностику...`);
+    const diagScript = path.join(__dirname, 'graph-diagnostic.js');
+    execSync(`node "${diagScript}"`, { stdio: 'inherit' });
+  } catch (e) {
+    console.error(`❌ Діагностика виявила проблеми.`);
+  }
+
+  // Видаляємо покажчик на поточну сесію
+  fs.unlinkSync(currentSessionPointer);
+
 } else {
   console.error('❌ Невідома команда.');
   process.exit(1);

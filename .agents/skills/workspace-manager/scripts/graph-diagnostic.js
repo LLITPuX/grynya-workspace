@@ -1,4 +1,6 @@
-const { spawnSync } = require('child_process');
+const { spawnSync, execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const REPO_NAME = 'grynya-workspace';
 const GRAPH = 'git_stream';
@@ -15,6 +17,13 @@ function runQuery(cypher) {
         return { error: true, msg: out };
     }
     return { error: false, data: out };
+}
+
+function getDataLines(res) {
+    if (res.error) return [];
+    return res.data.split('\n')
+        .map(l => l.trim())
+        .filter(l => l !== '' && !l.includes('internal execution time') && !l.includes('Cached execution'));
 }
 
 function checkDocker() {
@@ -50,23 +59,7 @@ function getStats() {
         console.error(`❌ Помилка при отриманні вузлів: ${nodeRes.msg}`);
     } else {
         console.log(`  🔹 Вузли:`);
-        const lines = nodeRes.data.split('\n').map(l => l.trim()).filter(l => l !== '' && !l.includes('internal execution time') && !l.includes('Cached execution'));
-        // Пропускаємо заголовки (label, count) та виводимо пари
-        for (let i = 2; i < lines.length; i += 2) {
-            if (lines[i] && lines[i+1]) {
-                console.log(`     - ${lines[i]}: ${lines[i+1]}`);
-            }
-        }
-    }
-
-    // Кількість ребер
-    const relQuery = "MATCH ()-[r]->() RETURN type(r) AS type, count(r) AS count";
-    const relRes = runQuery(relQuery);
-    if (relRes.error) {
-        console.error(`❌ Помилка при отриманні зв'язків: ${relRes.msg}`);
-    } else {
-        console.log(`  🔹 Зв'язки:`);
-        const lines = relRes.data.split('\n').map(l => l.trim()).filter(l => l !== '' && !l.includes('internal execution time') && !l.includes('Cached execution'));
+        const lines = getDataLines(nodeRes);
         for (let i = 2; i < lines.length; i += 2) {
             if (lines[i] && lines[i+1]) {
                 console.log(`     - ${lines[i]}: ${lines[i+1]}`);
@@ -76,56 +69,79 @@ function getStats() {
 }
 
 function checkIntegrity() {
-    console.log(`\n🛠️ ПЕРЕВІРКА ЦІЛІСНОСТИ (СИРІТСТВО):`);
+    console.log(`\n🛠️ ПЕРЕВІРКА ЦІЛІСНОСТИ СТРУКТУРИ:`);
     let issuesFound = 0;
 
-    const getDataLines = (res) => {
-        if (res.error) return [];
-        return res.data.split('\n')
-            .map(l => l.trim())
-            .filter(l => l !== '' && !l.includes('internal execution time') && !l.includes('Cached execution'));
-    };
-
     // 1. Файли без батьків
-    const orphanFilesRes = runQuery(`MATCH (f:File) WHERE NOT ()-[:CONTAINS]->(f) RETURN f.path`);
-    const orphanFiles = getDataLines(orphanFilesRes);
+    const orphanFiles = getDataLines(runQuery(`MATCH (f:File) WHERE NOT ()-[:CONTAINS]->(f) RETURN f.path`));
     if (orphanFiles.length > 1) {
-        console.warn(`⚠️  Знайдено файли без батьківських папок:`);
-        orphanFiles.slice(1).forEach(l => console.warn(`     - ${l}`));
+        console.warn(`⚠️  Знайдено файли без батьківських папок (${orphanFiles.length-1})`);
         issuesFound++;
     }
 
-    // 2. Папки без батьків (крім кореневої)
-    const orphanFoldersRes = runQuery(`MATCH (f:Folder) WHERE NOT ()-[:CONTAINS]->(f) AND f.path <> '${REPO_NAME}' RETURN f.path`);
-    const orphanFolders = getDataLines(orphanFoldersRes);
-    if (orphanFolders.length > 1) {
-        console.warn(`⚠️  Знайдено папки без батьків:`);
-        orphanFolders.slice(1).forEach(l => console.warn(`     - ${l}`));
-        issuesFound++;
-    }
-
-    // 3. Комміти без прив'язки до файлів
-    const orphanCommitsRes = runQuery(`MATCH (c:Commit) WHERE NOT (:File)-[:HAS_COMMIT]->(c) RETURN c.sha`);
-    const orphanCommits = getDataLines(orphanCommitsRes);
+    // 2. Комміти без прив'язки до файлів
+    const orphanCommits = getDataLines(runQuery(`MATCH (c:Commit) WHERE NOT (:File)-[:HAS_COMMIT]->(c) RETURN c.sha`));
     if (orphanCommits.length > 1) {
-        console.warn(`⚠️  Знайдено комміти без прив'язки до файлів:`);
-        orphanCommits.slice(1).forEach(l => console.warn(`     - ${l}`));
+        console.warn(`⚠️  Знайдено комміти без прив'язки до файлів (${orphanCommits.length-1})`);
         issuesFound++;
     }
 
-    // 4. Комміти без часової відмітки
-    const ghostCommitsRes = runQuery(`MATCH (c:Commit) WHERE NOT (:Day)-[:AT]->(c) RETURN c.sha`);
-    const ghostCommits = getDataLines(ghostCommitsRes);
-    if (ghostCommits.length > 1) {
-        console.warn(`⚠️  Знайдено комміти без часової відмітки (Day -> AT -> Commit):`);
-        ghostCommits.slice(1).forEach(l => console.warn(`     - ${l}`));
-        issuesFound++;
-    }
+    if (issuesFound === 0) console.log(`✅ Проблем зі структурою не виявлено.`);
+}
+
+function checkSessionIntegrity() {
+    console.log(`\n📂 ПЕРЕВІРКА СЕСІЙ ТА ЛОГІВ:`);
+    let issuesFound = 0;
+
+    const skillsDir = path.resolve(__dirname, '..', '..');
+    const skills = fs.readdirSync(skillsDir).filter(f => fs.lstatSync(path.join(skillsDir, f)).isDirectory() && !f.startsWith('.'));
+
+    skills.forEach(skill => {
+        const logsDir = path.join(skillsDir, skill, 'logs');
+        if (fs.existsSync(logsDir)) {
+            const sessions = fs.readdirSync(logsDir).filter(f => f.startsWith('session_') && f.endsWith('.json'));
+            sessions.forEach(file => {
+                const filePath = path.join(logsDir, file);
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+                if (data.status === 'Завершено') {
+                    // 1. Перевірка заповнення шаблону
+                    if (data.summary.includes('[') || data.summary === "") {
+                        console.warn(`⚠️  [${skill}] Сесія ${file} має незаповнений summary.`);
+                        issuesFound++;
+                    }
+
+                    // 2. Перевірка наявності в графі
+                    const nodeRes = runQuery(`MATCH (c:Commit) WHERE c.message CONTAINS '${file}' RETURN c.sha`);
+                    const nodes = getDataLines(nodeRes);
+                    if (nodes.length <= 1) {
+                        console.warn(`⚠️  [${skill}] Сесія ${file} не знайдена в FalkorDB (коміт відсутній).`);
+                        issuesFound++;
+                    } else {
+                        const sha = nodes[1];
+                        // 3. Перевірка наявності Summary для кожного файлу
+                        if (data.files_changed) {
+                            data.files_changed.forEach(fc => {
+                                const sumRes = runQuery(`MATCH (c:Commit {sha: '${sha}'})-[:DETAILS]->(s:Summary {file: '${fc.file}'}) RETURN s.text`);
+                                const sums = getDataLines(sumRes);
+                                if (sums.length <= 1) {
+                                    console.warn(`⚠️  [${skill}] Відсутній вузол Summary для файлу ${fc.file} у комміті ${sha}.`);
+                                    issuesFound++;
+                                } else if (sums[1].includes('[Автоматично додано]')) {
+                                    console.warn(`ℹ️  [${skill}] Файл ${fc.file} має лише автоматичний опис. Бажано додати деталі.`);
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+        }
+    });
 
     if (issuesFound === 0) {
-        console.log(`✅ Проблем зі структурою не виявлено.`);
+        console.log(`✅ Всі закриті сесії коректно заповнені та синхронізовані.`);
     } else {
-        console.log(`\n💡 Порада: Якщо вузлів багато, спробуйте виконати повну ініціалізацію: node .agents/skills/workspace-manager/scripts/sync-git-init.js`);
+        console.log(`❌ Знайдено ${issuesFound} зауважень до логів сесій.`);
     }
 }
 
@@ -135,4 +151,5 @@ checkDocker();
 checkPing();
 getStats();
 checkIntegrity();
+checkSessionIntegrity();
 console.log(`\n🏁 Діагностика завершена.`);
