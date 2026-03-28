@@ -102,8 +102,18 @@ if (command === 'open') {
     });
 
     sessionData.files_changed = mergedFiles;
+
+    // 1b. Валідація: перевірка на наявність плейсхолдерів
+    const emptySummaries = mergedFiles.filter(f => f.summary === "[Очікує на детальний опис]");
+    if (emptySummaries.length > 0) {
+      fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2), 'utf8'); // Зберігаємо оновлений список для зручності редагування
+      console.error(`❌ Помилка: Знайдено ${emptySummaries.length} файлів без детального опису:`);
+      emptySummaries.forEach(f => console.error(`   - ${f.file}`));
+      console.error(`\nБудь ласка, заповніть описи у ${filePath} перед повторною спробою закриття сесії.`);
+      process.exit(1);
+    }
   } catch (e) {
-    console.warn('⚠️ Не вдалося отримати статус Git.');
+    console.warn('⚠️ Не вдалося отримати статус Git або валідувати дані.');
   }
 
   // 2. Оновлення даних
