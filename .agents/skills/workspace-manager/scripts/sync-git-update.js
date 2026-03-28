@@ -69,7 +69,7 @@ function syncIncremental() {
                 const files = filesOutput.split('\n').filter(f => f.trim());
                 if (files.length > 0) {
                     const filesData = toCypher(files.map(f => ({ path: f, sha: c.sha })));
-                    runQuery(`UNWIND ${filesData} AS row MATCH (f:File {path: row.path}), (c:Commit {sha: row.sha}) MERGE (f)-[:HAS_COMMIT]->(c)`);
+                    runQuery(`UNWIND ${filesData} AS row MERGE (f:File {path: row.path}) WITH f, row MATCH (c:Commit {sha: row.sha}) MERGE (f)-[:HAS_COMMIT]->(c)`);
                 }
             });
         }
@@ -113,7 +113,8 @@ function processSessionLogs() {
                             }));
                             
                             const query = `UNWIND ${toCypher(summaries)} AS row
-                                MATCH (c:Commit {sha: row.sha}), (f:File {path: row.file})
+                                MATCH (c:Commit {sha: row.sha})
+                                MERGE (f:File {path: row.file})
                                 MERGE (s:Summary {file: row.file, sha: row.sha})
                                 SET s.text = row.summary
                                 MERGE (c)-[:DETAILS]->(s)
