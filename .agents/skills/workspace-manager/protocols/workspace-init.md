@@ -31,8 +31,15 @@ git checkout -b main
 ```
 
 ### Крок 4. Налаштувати Docker-оточення
+Створити `Dockerfile` та `docker-compose.yml` в корені.
 
-Створити `Dockerfile` та `docker-compose.yml` в корені (якщо вони відсутні) для забезпечення ізоляції.
+> [!TIP]
+> Для коректної роботи Hot Reload на Windows, у секцію `environment` сервісів необхідно додати:
+> ```yaml
+> environment:
+>   CHOKIDAR_USEPOLLING: "true"
+>   WATCHPACK_POLLING: "true"
+> ```
 
 ### Крок 5. Запустити середовище
 

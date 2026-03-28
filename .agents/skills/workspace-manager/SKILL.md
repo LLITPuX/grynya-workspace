@@ -11,11 +11,14 @@ description: Управління робочим простором — ініц
 
 | Протокол | Файл | Коли застосовувати |
 |----------|------|--------------------|
-| Ініціалізація воркспейсу | `protocols/workspace-init.md` | Створення нового проєкту з нуля |
+| Ініціалізація воркспейсу | `protocols/workspace-init.md` | Створення нового проєкту з нуля (Docker, Git) |
 | Встановлення Firecrawl | `protocols/firecrawl-setup.md` | Потрібен локальний MCP-сервер для веб-скрапінгу |
 | Створення скілів | `protocols/create-skill.md` | Додавання нового скілу до воркспейсу |
-| Відкриття сесії | `protocols/session-open.md` | Отримання контексту на початку роботи |
-| Закриття сесії | `protocols/session-close.md` | Фіксація досвіду в кінці роботи |
+| Відкриття сесії | `protocols/session-open.md` | Отримання контексту та оновлення MCP-конфігу |
+| Закриття сесії | `protocols/session-close.md` | Фіксація досвіду та аудит документації |
+| Управління MCP | `protocols/mcp-management.md` | Додавання/оновлення MCP серверів |
+| Середовище розробки | `protocols/dev-environment.md` | Hot Reload, поллінг на Windows, Bind Mounts |
+| Обслуговування | `protocols/infrastructure-maintenance.md` | Healthcheck контейнерів, очищення логів |
 
 ## Як використовувати
 
@@ -29,5 +32,7 @@ description: Управління робочим простором — ініц
 | Файл | Призначення |
 |------|-------------|
 | `scripts/scaffold-skill.js` | Створює структуру нового скілу |
+| `scripts/session-log.js` | Автоматизує відкриття/закриття сесій |
+| `scripts/update-mcp-config.js` | Синхронізує mcp_config.json з Docker |
 | `examples/skill-template.md` | Шаблон SKILL.md для нових скілів |
 | `resources/self_host_firecrawl.md` | Довідник з self-hosting Firecrawl |
