@@ -47,7 +47,19 @@ git checkout -b main
 docker compose up -d
 ```
 
-### Крок 6. Перший коміт
+### Крок 6. Налаштувати Інфраструктуру (Firecrawl & FalkorDB)
+
+1. **Firecrawl**: Виконати `protocols/firecrawl-setup.md`.
+2. **FalkorDB**: Виконати `protocols/falkordb-setup.md`.
+
+### Крок 7. Первинна синхронізація Git-графа
+
+Після того як FalkorDB запущено, необхідно побудувати початковий граф репозиторію:
+```bash
+node .agents/skills/workspace-manager/scripts/sync-git-init.js
+```
+
+### Крок 8. Перший коміт
 
 ```bash
 git add .
