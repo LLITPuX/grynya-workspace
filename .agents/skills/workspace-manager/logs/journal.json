@@ -175,5 +175,26 @@
       "Розробити Cypher-візуалізації для нативного пошуку по історії та часовій лінії"
     ],
     "date_closed": "2026-03-28T15:35:00Z"
+  },
+  {
+    "date": "2026-03-28T14:39:11.941Z",
+    "session_id": "unknown",
+    "status": "Завершено",
+    "summary": "Впроваджено діагностику графа FalkorDB: новий скрипт `graph-diagnostic.js` та протокол `graph-diagnostic.md`. Оновлено `SKILL.md`.",
+    "docs_updated": "Так — SKILL.md, protocols/graph-diagnostic.md, scripts/graph-diagnostic.js",
+    "errors": [
+      "Початкова логіка парсингу `redis-cli` (через коми) виявилася неробочою для `spawnSync` на Windows"
+    ],
+    "lessons": [
+      {
+        "problem": "Вивід `redis-cli graph.query` у консольному режимі повертає дані рядок за рядком, а не в CSV",
+        "solution": "Реалізовано парсинг пар рядків (заголовок/значення) з ігноруванням рядків технічної статистики FalkorDB."
+      }
+    ],
+    "next_steps": [
+      "Додати візуальні Cypher-запити в протокол для глибшого аналізу",
+      "Інтегрувати автоматичний запуск діагностики в `sync-git-init.js`"
+    ],
+    "date_closed": "2026-03-28T16:45:00Z"
   }
 ]

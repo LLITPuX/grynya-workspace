@@ -20,6 +20,7 @@ description: Управління робочим простором — ініц
 | Управління MCP | `protocols/mcp-management.md` | Додавання/оновлення MCP серверів |
 | Середовище розробки | `protocols/dev-environment.md` | Hot Reload, поллінг на Windows, Bind Mounts |
 | Обслуговування | `protocols/infrastructure-maintenance.md` | Healthcheck контейнерів, очищення логів |
+| Діагностика графа | `protocols/graph-diagnostic.md` | Перевірка цілісності та статистики FalkorDB |
 
 ## Як використовувати
 
@@ -37,5 +38,6 @@ description: Управління робочим простором — ініц
 | `scripts/sync-git-init.js` | Повна ініціалізація графа Git |
 | `scripts/sync-git-update.js` | Інкрементальне оновлення графа |
 | `scripts/update-mcp-config.js` | Синхронізує mcp_config.json з Docker |
+| `scripts/graph-diagnostic.js` | Діагностика цілісності та статистики графа |
 | `examples/skill-template.md` | Шаблон SKILL.md для нових скілів |
 | `resources/self_host_firecrawl.md` | Довідник з self-hosting Firecrawl |
