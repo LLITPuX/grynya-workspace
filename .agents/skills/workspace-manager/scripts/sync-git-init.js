@@ -1,7 +1,28 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
+const { execSync, spawnSync } = require('child_process');
 
 const REPO_NAME = 'grynya-workspace';
+const GRAPH = 'git_stream';
+
+function toCypher(obj) {
+    // Перетворює JSON-об'єкт або масив у формат Cypher мапи (ключі без лапок)
+    return JSON.stringify(obj).replace(/"([^"]+)":/g, '$1:');
+}
+
+function runQuery(cypher) {
+    const res = spawnSync('docker', ['exec', 'falkordb', 'redis-cli', 'graph.query', GRAPH, cypher], {
+        encoding: 'utf8'
+    });
+    if (res.status !== 0) {
+        console.error(`// СИСТЕМНА ПОМИЛКА [status ${res.status}]: ${res.stderr || res.stdout}`);
+    } else {
+        const out = res.stdout.trim();
+        if (out.includes('errMsg')) {
+            console.error(`// ПОМИЛКА БД: ${out}`);
+        } else {
+            console.log(`// ВІДПОВІДЬ: ${out.split('\n')[0]}`);
+        }
+    }
+}
 
 function getGitFiles() {
     return execSync('git ls-files', { encoding: 'utf8' }).split('\n').filter(f => f.trim() !== '');
@@ -15,23 +36,27 @@ function getFileHistory(filePath) {
             const date = new Date(dateStr);
             return {
                 sha,
-                message: message.replace(/'/g, "\\'").replace(/"/g, '\\"'),
-                year: date.getFullYear(),
-                month: date.getMonth() + 1,
+                message: message.replace(/"/g, "'").replace(/'/g, "\\'"), 
+                y: date.getFullYear(),
+                m: date.getMonth() + 1,
                 day: date.getDate(),
-                time: date.toTimeString().split(' ')[0]
+                t: date.toTimeString().split(' ')[0]
             };
         });
     } catch (e) { return []; }
 }
 
+console.log(`// --- Очищення графа ---`);
+runQuery("MATCH (n) DETACH DELETE n");
+
+console.log(`// --- Ініціалізація репозиторію ---`);
+runQuery(`MERGE (r:Repository {name: "${REPO_NAME}", path: "${REPO_NAME}"})`);
+
 const files = getGitFiles();
 const fileNodes = [];
 const folderNodes = new Set();
-const relationships = [];
 const commits = [];
 
-// Побудова дерева
 files.forEach(file => {
     const parts = file.split('/');
     let parentPath = REPO_NAME;
@@ -42,15 +67,8 @@ files.forEach(file => {
         
         if (isFile) {
             fileNodes.push({ name: part, path: currentPath, parent: parentPath });
-            // Історія
             const history = getFileHistory(currentPath);
-            history.forEach((c, idx) => {
-                commits.push({ ...c, filePath: currentPath });
-                if (idx > 0) {
-                    // Зв'язок між коммітами (ланцюжок)
-                    // (history[idx-1] -> history[idx]) - в git log вони йдуть від нових до старих
-                }
-            });
+            history.forEach(c => commits.push({ ...c, file: currentPath }));
         } else {
             folderNodes.add(JSON.stringify({ name: part, path: currentPath, parent: parentPath }));
         }
@@ -60,38 +78,36 @@ files.forEach(file => {
 
 const folders = Array.from(folderNodes).map(f => JSON.parse(f));
 
-console.log(`// --- INITIALIZATION ---`);
-console.log(`MERGE (r:Repository {name: '${REPO_NAME}'})`);
-
-// Вивід даних для UNWIND
-console.log(`\n// --- FOLDERS ---`);
-console.log(`UNWIND [${folders.map(f => `{name: '${f.name}', path: '${f.path}', parent: '${f.parent}'}`).join(', ')}] AS row`);
-console.log(`MERGE (f:Folder {path: row.path}) SET f.name = row.name`);
-
-// Зв'язки папок
-console.log(`\n// --- FOLDER RELATIONS ---`);
-console.log(`UNWIND [${folders.map(f => `{path: '${f.path}', parent: '${f.parent}'}`).join(', ')}] AS row`);
-console.log(`MATCH (p {path: row.parent})`);
-console.log(`MATCH (f:Folder {path: row.path})`);
-console.log(`MERGE (p)-[:CONTAINS]->(f)`);
-
-// Файли
-console.log(`\n// --- FILES ---`);
-console.log(`UNWIND [${fileNodes.map(f => `{name: '${f.name}', path: '${f.path}', parent: '${f.parent}'}`).join(', ')}] AS row`);
-console.log(`MATCH (p {path: row.parent})`);
-console.log(`MERGE (f:File {path: row.path}) SET f.name = row.name`);
-console.log(`MERGE (p)-[:CONTAINS]->(f)`);
-
-// Комміти та Час (Пакетно по 50 коммітів щоб не перевантажити)
-for (let i = 0; i < commits.length; i += 50) {
-    const batch = commits.slice(i, i + 50);
-    console.log(`\n// --- COMMITS BATCH ${Math.floor(i/50) + 1} ---`);
-    console.log(`UNWIND [${batch.map(c => `{sha: '${c.sha}', msg: '${c.message}', y: ${c.year}, m: ${c.month}, d: ${c.day}, t: '${c.time}', file: '${c.filePath}'}`).join(', ')}] AS row`);
-    console.log(`MATCH (f:File {path: row.file})`);
-    console.log(`MERGE (c:Commit {sha: row.sha}) SET c.message = row.msg`);
-    console.log(`MERGE (f)-[:HAS_COMMIT]->(c)`);
-    console.log(`MERGE (y:Year {value: row.y})`);
-    console.log(`MERGE (day:Day {value: row.d, year: row.y, month: row.m})`); // Унікальність дня
-    console.log(`MERGE (y)-[:MONTH {number: row.m}]->(day)`);
-    console.log(`MERGE (day)-[:AT {time: row.t}]->(c)`);
+console.log(`// --- Створення папок ---`);
+const fBatch = 20;
+for (let i = 0; i < folders.length; i += fBatch) {
+    const batch = folders.slice(i, i + fBatch);
+    const data = toCypher(batch);
+    runQuery(`UNWIND ${data} AS row MERGE (f:Folder {path: row.path}) SET f.name = row.name`);
+    runQuery(`UNWIND ${data} AS row MATCH (p {path: row.parent}), (f:Folder {path: row.path}) MERGE (p)-[:CONTAINS]->(f)`);
 }
+
+console.log(`// --- Створення файлів ---`);
+for (let i = 0; i < fileNodes.length; i += fBatch) {
+    const batch = fileNodes.slice(i, i + fBatch);
+    const data = toCypher(batch);
+    runQuery(`UNWIND ${data} AS row MATCH (p {path: row.parent}) MERGE (f:File {path: row.path}) SET f.name = row.name MERGE (p)-[:CONTAINS]->(f)`);
+}
+
+console.log(`// --- Створення коммітів та часової сітки (${commits.length}) ---`);
+const cBatch = 10;
+for (let i = 0; i < commits.length; i += cBatch) {
+    const batch = commits.slice(i, i + cBatch);
+    const data = toCypher(batch);
+    const query = `UNWIND ${data} AS row 
+        MATCH (f:File {path: row.file})
+        MERGE (c:Commit {sha: row.sha}) SET c.message = row.message
+        MERGE (f)-[:HAS_COMMIT]->(c)
+        MERGE (y:Year {value: row.y})
+        MERGE (day:Day {value: row.day, year: row.y, month: row.m})
+        MERGE (y)-[:MONTH {number: row.m}]->(day)
+        MERGE (day)-[:AT {time: row.t}]->(c)`;
+    runQuery(query);
+}
+
+console.log("// --- Ініціалізація завершена успішно ---");

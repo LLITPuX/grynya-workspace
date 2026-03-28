@@ -1,18 +1,27 @@
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 
+const REPO_NAME = 'grynya-workspace';
 const GRAPH = 'git_stream';
+
+function toCypher(obj) {
+    return JSON.stringify(obj).replace(/"([^"]+)":/g, '$1:');
+}
+
+function runQuery(cypher) {
+    const res = spawnSync('docker', ['exec', 'falkordb', 'redis-cli', 'graph.query', GRAPH, cypher], {
+        encoding: 'utf8'
+    });
+    return res;
+}
 
 function getLatestCommitInGraph() {
     try {
-        // Отримуємо останній SHA з бази (найсвіжіший за часом у графі)
         const output = execSync(`docker exec falkordb redis-cli graph.query ${GRAPH} "MATCH (y:Year)-[:MONTH]->(d:Day)-[:AT]->(c:Commit) RETURN c.sha ORDER BY y.value DESC, d.month DESC, d.value DESC LIMIT 1"`, { encoding: 'utf8' });
         const lines = output.split('\n').filter(l => l.trim() && !l.includes('internal execution time') && !l.includes('Cached execution') && !l.includes('c.sha'));
         if (lines.length > 0) {
             return lines[0].trim();
         }
-    } catch (e) {
-        console.error("// Помилка при отриманні SHA з FalkorDB:", e.message);
-    }
+    } catch (e) {}
     return null;
 }
 
@@ -35,7 +44,7 @@ function syncIncremental() {
             const d = new Date(dateStr);
             return {
                 sha,
-                msg: msg.replace(/'/g, "\\'"),
+                message: msg.replace(/"/g, "'").replace(/'/g, "\\'"),
                 y: d.getFullYear(),
                 m: d.getMonth() + 1,
                 day: d.getDate(),
@@ -43,26 +52,23 @@ function syncIncremental() {
             };
         });
 
-        // Формуємо UNWIND запит для кожного комміта (спрощено: один коміт може стосуватися багатьох файлів, 
-        // але тут ми просто оновлюємо часову сітку та реєструємо комміт)
-        const unwindData = JSON.stringify(commits).replace(/"/g, "'");
-        const query = `UNWIND ${unwindData} AS row 
-            MERGE (c:Commit {sha: row.sha}) SET c.message = row.msg 
+        const data = toCypher(commits);
+        const query = `UNWIND ${data} AS row 
+            MERGE (c:Commit {sha: row.sha}) SET c.message = row.message
             MERGE (y:Year {value: row.y}) 
             MERGE (day:Day {value: row.day, year: row.y, month: row.m}) 
             MERGE (y)-[:MONTH {number: row.m}]->(day) 
             MERGE (day)-[:AT {time: row.t}]->(c)`;
 
-        execSync(`docker exec falkordb redis-cli graph.query ${GRAPH} "${query}"`);
+        runQuery(query);
         console.log(`// Оновлено графу новими коммітами: ${commits.length}`);
 
-        // Важливо: для кожного комміта треба також оновити зв'язки з файлами (спрощено через git show)
+        // Оновлення зв'язків з файлами
         commits.forEach(c => {
             const filesOutput = execSync(`git show --name-only --pretty=format: ${c.sha}`, { encoding: 'utf8' }).trim();
             const files = filesOutput.split('\n').filter(f => f.trim());
-            const filesData = JSON.stringify(files.map(f => ({ path: f, sha: c.sha }))).replace(/"/g, "'");
-            const fileQuery = `UNWIND ${filesData} AS row MATCH (f:File {path: row.path}), (c:Commit {sha: row.sha}) MERGE (f)-[:HAS_COMMIT]->(c)`;
-            execSync(`docker exec falkordb redis-cli graph.query ${GRAPH} "${fileQuery}"`);
+            const filesData = toCypher(files.map(f => ({ path: f, sha: c.sha })));
+            runQuery(`UNWIND ${filesData} AS row MATCH (f:File {path: row.path}), (c:Commit {sha: row.sha}) MERGE (f)-[:HAS_COMMIT]->(c)`);
         });
 
     } catch (e) {
